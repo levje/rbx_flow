@@ -43,9 +43,6 @@ DESCRIPTION
 
 
     OPTIONAL ARGUMENTS (current value)
-    --run_average_bundles               Run average bundles ($run_average_bundles)
-
-
     --minimal_vote_ratio                Percentage of the vote to obtain in order to be considered valid ($minimal_vote_ratio)
     --seed                              List of random seeds values for the rng ($seed)
     --outlier_alpha                     Remove spurious streamlines based on shape ($outlier_alpha)
