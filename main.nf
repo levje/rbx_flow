@@ -5,7 +5,6 @@ if(params.help) {
     cpu_count = Runtime.runtime.availableProcessors()
 
     bindings = ["atlas_directory":"$params.atlas_directory",
-                "run_average_bundles":"$params.run_average_bundles",
                 "minimal_vote_ratio":"$params.minimal_vote_ratio",
                 "seed":"$params.seed",
                 "outlier_alpha":"$params.outlier_alpha",
@@ -44,7 +43,6 @@ log.info "[Recobundles options]"
 log.info "Minimal Vote Percentage: $params.minimal_vote_ratio"
 log.info "Random Seed: $params.seed"
 log.info "Outlier Removal Alpha: $params.outlier_alpha"
-log.info "Run Average Bundles: $params.run_average_bundles"
 log.info ""
 log.info ""
 
@@ -60,7 +58,7 @@ Channel
     .fromPath("$root/**/*fa.nii.gz",
                     maxDepth:1)
     .map{[it.parent.name, it]}
-    .into{anat_for_registration;anat_for_reference_centroids;anat_for_reference_bundles}
+    .into{anat_for_registration;anat_for_reference_bundles}
 
 atlas_directory = Channel.fromPath("$params.atlas_directory/atlas")
 
@@ -89,8 +87,7 @@ process Register_Anat {
     set sid, file(native_anat), file(atlas) from anats_for_registration
 
     output:
-    set sid, "${sid}__output0GenericAffine.mat" into transformation_for_recognition, transformation_for_centroids
-    set sid, "${sid}__output0GenericAffine.mat" into transformation_for_average
+    set sid, "${sid}__output0GenericAffine.mat" into transformation_for_recognition
     file "${sid}__outputWarped.nii.gz"
     file "${sid}__native_anat.nii.gz"
 
@@ -101,30 +98,6 @@ process Register_Anat {
     cp ${native_anat} ${sid}__native_anat.nii.gz
     """
 }
-
-anat_for_reference_centroids
-    .join(transformation_for_centroids, by: 0)
-    .combine(atlas_centroids)
-    .set{anat_and_transformation}
-process Transform_Centroids {
-    input:
-    set sid, file(anat), file(transfo), file(centroids_dir) from anat_and_transformation
-
-    output:
-    file "${sid}__*.trk" optional true
-
-    script:
-    """
-    for centroid in ${centroids_dir}/*.trk;
-        do bname=\${centroid/_centroid/}
-        bname=\$(basename \$bname .trk)
-
-        scil_apply_transform_to_tractogram.py \${centroid} ${anat} ${transfo} tmp.trk --inverse --keep_invalid -f
-        scil_remove_invalid_streamlines.py tmp.trk ${sid}__\${bname}.trk --cut_invalid --remove_single_point --remove_overlapping_points --no_empty
-    done
-    """
-}
-
 
 tractogram_for_recognition
     .join(anat_for_reference_bundles)
@@ -154,7 +127,6 @@ process Recognize_Bundles {
     """
 }
 
-
 bundles_for_cleaning
     .combine(transformation_for_average, by:0)
     .combine(atlas_anat_for_average)
@@ -164,8 +136,7 @@ process Clean_Bundles {
     set sid, file(bundles), file(transfo), file(atlas) from all_bundles_transfo_for_clean_average
 
     output:
-    set sid, "${sid}__*_cleaned.trk" 
-    file "${sid}__*.nii.gz" optional true into bundle_for_average
+    set sid, "${sid}__*_cleaned.trk" into bundle_for_count
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -183,15 +154,7 @@ process Clean_Bundles {
             --alpha $params.outlier_alpha
             
         if [ -s "${sid}__\${bname}_cleaned.trk" ]; then 
-            if ${params.run_average_bundles}; then
-                scil_apply_transform_to_tractogram.py "${sid}__\${bname}_cleaned.trk" \
-		            ${atlas} ${transfo} tmp.trk --remove_invalid -f
-            
-                scil_compute_streamlines_density_map.py tmp.trk "${sid}__\${bname}_density_mni.nii.gz"
-
-                scil_image_math.py lower_threshold "${sid}__\${bname}_density_mni.nii.gz" 0.01 \
-                    "${sid}__\${bname}_binary_mni.nii.gz"
-            fi
+            echo "Bundle \${bname} cleaned."
         else
             echo "After cleaning \${bundle} all streamlines were outliers."
         fi
@@ -199,39 +162,23 @@ process Clean_Bundles {
     """
 }
 
-
-bundle_for_average
-    .flatten()
-    .transpose()
-    .combine(atlas_centroids_for_average)
-    .groupTuple(by: 1)
-    .set{all_bundle_for_average}
-process Average_Bundles {
-    publishDir = params.Average_Bundles_Publish_Dir
+process Count_Streamlines {
     input:
-    set file(bundles), file(centroids_dir) from all_bundle_for_average
+    set sid, file(bundles) from bundle_for_count
 
     output:
-    file "*_average_density_mni.nii.gz" optional true
-    file "*_average_binary_mni.nii.gz" optional true
-
-    when:
-        params.run_average_bundles
+    set sid, file("${sid}__*_count.txt") into bundle_counts
 
     script:
+    String bundles_list = bundles.join(", ").replace(',', '')
     """
-    shopt -s nullglob
-    mkdir tmp/
-    for centroid in $centroids_dir/*.trk;
-        do bname=\${centroid/_centroid/}
-        bname=\$(basename \$bname .trk)
-
-        nfiles=\$(find ./ -maxdepth 1 -type f -name "*__\${bname}_density_mni.nii.gz" | wc -l)
-        if [[ \$nfiles -gt 0 ]];
-            then scil_image_math.py addition *__\${bname}_density_mni.nii.gz 0 tmp/\${bname}_average_density_mni.nii.gz
-            scil_image_math.py addition *__\${bname}_binary_mni.nii.gz 0 tmp/\${bname}_average_binary_mni.nii.gz
-        fi
+    total_count=0
+    for bundle in $bundles_list; do
+        bname=\$(basename \${bundle} .trk)
+        scil_count_streamlines.py \${bundle} --print_count_alone > ${sid}__\${bname}_count.txt
+        count=\$(< ${sid}__\${bname}_count.txt)
+        total_count=\$((total_count + count))
     done
-    mv tmp/* ./
+    echo "Total streamlines counted: \$total_count" > ${sid}__total_count.txt
     """
 }
