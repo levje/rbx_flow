@@ -46,7 +46,6 @@ log.info "Outlier Removal Alpha: $params.outlier_alpha"
 log.info ""
 log.info ""
 
-log.info "Here 0"
 log.info "Input: $params.input"
 root = file(params.input)
 /* Watch out, files are ordered alphabetically in channel */
@@ -54,14 +53,13 @@ tractogram_for_recognition = Channel
      .fromFilePairs("$root/**/{*tracking*.*,}",
                     size: -1,
                     maxDepth:1) {it.parent.name}
-log.info "Here 1"
+
 Channel
     .fromPath("$root/**/*fa.nii.gz",
                     maxDepth:1)
     .map{[it.parent.name, it]}
     .into{anat_for_registration;anat_for_reference_bundles}
 
-log.info "Here "
 
 atlas_directory = Channel.fromPath("$params.atlas_directory/atlas")
 
@@ -78,8 +76,6 @@ workflow.onComplete {
     log.info "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
     log.info "Execution duration: $workflow.duration"
 }
-
-log.info "Here 3"
 
 anat_for_registration
     .combine(atlas_anat)
