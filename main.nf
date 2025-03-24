@@ -116,7 +116,7 @@ process Recognize_Bundles {
 
     output:
     set sid, "*.trk" into bundles_for_cleaning
-    file "results.json"
+    file "results.json" into results_json
     file "logfile.txt"
 
     script:
@@ -136,13 +136,16 @@ bundles_for_cleaning
 process Clean_Bundles {
     input:
     set sid, file(bundles), file(transfo), file(atlas) from all_bundles_transfo_for_clean_average
+    file(results) from results_json
 
     output:
     set sid, "${sid}__*_cleaned.trk" into bundle_for_count
+    file "${sid}__results_indices.json" into results_indices
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
     """
+    cp ${results} ${sid}__results_indices.json
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -153,7 +156,7 @@ process Clean_Bundles {
         fi
 
         scil_outlier_rejection.py \${bundle} "${sid}__\${bname}_cleaned.trk" \
-            --alpha $params.outlier_alpha
+            --alpha $params.outlier_alpha --results_json ${sid}__results_indices.json --bname \${bname}
             
         if [ -s "${sid}__\${bname}_cleaned.trk" ]; then 
             echo "Bundle \${bname} cleaned."
@@ -164,23 +167,23 @@ process Clean_Bundles {
     """
 }
 
-process Count_Streamlines {
-    input:
-    set sid, file(bundles) from bundle_for_count
+// process Count_Streamlines {
+//     input:
+//     set sid, file(bundles) from bundle_for_count
 
-    output:
-    set sid, file("${sid}__*_count.txt") into bundle_counts
+//     output:
+//     set sid, file("${sid}__*_count.txt") into bundle_counts
 
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    total_count=0
-    for bundle in $bundles_list; do
-        bname=\$(basename \${bundle} .trk)
-        scil_count_streamlines.py \${bundle} --print_count_alone > ${sid}__\${bname}_count.txt
-        count=\$(< ${sid}__\${bname}_count.txt)
-        total_count=\$((total_count + count))
-    done
-    echo "Total streamlines counted: \$total_count" > ${sid}__total_count.txt
-    """
-}
+//     script:
+//     String bundles_list = bundles.join(", ").replace(',', '')
+//     """
+//     total_count=0
+//     for bundle in $bundles_list; do
+//         bname=\$(basename \${bundle} .trk)
+//         scil_count_streamlines.py \${bundle} --print_count_alone > ${sid}__\${bname}_count.txt
+//         count=\$(< ${sid}__\${bname}_count.txt)
+//         total_count=\$((total_count + count))
+//     done
+//     echo "Total streamlines counted: \$total_count" > ${sid}__total_count.txt
+//     """
+// }
