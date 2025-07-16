@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+nextflow.enable.dsl=2
+
 include { HANDLE_USAGE_AND_HEADER } from './inputs.nf'
 include { RBX_CORE } from './rbx_flow.nf'
 
