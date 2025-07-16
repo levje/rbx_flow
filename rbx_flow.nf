@@ -2,6 +2,7 @@
 process Register_Anat {
     cpus params.register_processes
     memory '2 GB'
+    publishDir "${params.publishDirRoot}/${sid}/Register_Anat"
 
     input:
     tuple val(sid), path(native_anat), path(atlas)
@@ -22,6 +23,7 @@ process Register_Anat {
 process Recognize_Bundles {
     cpus params.rbx_processes
     memory { params.single_dataset_size_GB.GB * params.rbx_processes }
+    publishDir "${params.publishDirRoot}/${sid}/Recognize_Bundles"
 
     input:
     tuple val(sid), path(tractograms), path(reference), path(transfo), path(config), path(directory)
@@ -53,6 +55,7 @@ process Recognize_Bundles {
 process Clean_Bundles {
     cpus 1
     memory '2 GB'
+    publishDir "${params.publishDirRoot}/${sid}/Clean_Bundles"
 
     input:
     tuple val(sid), path(bundles), path(results), path(transfo), path(atlas)
