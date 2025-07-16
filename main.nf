@@ -7,7 +7,6 @@ workflow {
     // Print usage and header information.
     // This will also check if the required parameters are set.
     HANDLE_USAGE_AND_HEADER()
-    HANDLE_USAGE_AND_HEADER.waitForCompletion()
 
     // Directory holding the input data.
     root = file(params.input)
