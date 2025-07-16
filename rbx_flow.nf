@@ -53,8 +53,6 @@ process Recognize_Bundles {
 }
 
 process Clean_Bundles {
-    cpus 1
-    memory '2 GB'
     publishDir "${params.publishDirRoot}/${sid}/Clean_Bundles"
 
     input:
