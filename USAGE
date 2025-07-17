@@ -5,8 +5,8 @@ USAGE
 
 nextflow run main.nf --input ... [OPTIONAL_ARGUMENTS]
 To call with a container add:
-    -with-singularity scilus/scilus:1.6.0
-    -with-docker scilus/scilus:1.6.0
+    -with-singularity scilus/scilus:2.1.0
+    -with-docker scilus/scilus:2.1.0
 
 The recommanded atlas is available at https://zenodo.org/record/7950602
 
