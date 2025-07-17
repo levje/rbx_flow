@@ -42,7 +42,7 @@ workflow HANDLE_USAGE_AND_HEADER {
         engine = new groovy.text.SimpleTemplateEngine()
         template = engine.createTemplate(usage.text).make(bindings)
         print template.toString()
-        return
+        System.exit()
     }
     
     log.info "SCIL RecobundlesX pipeline"
